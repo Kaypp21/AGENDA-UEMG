@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda UEMG - Prazos e Atividades</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="src/css/style.css">
+    <link rel="icon" href="src/img/logo-uemg-2.png" type="image/png">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+
+    <main id="login-screen">
+        <div class="login-brand">
+            <img src="src/img/logo-uemg-2.png" alt="Logo UEMG" class="logo-uemg-login">
+            <h1 class="brand-title">Agenda UEMG</h1>
+            <p class="brand-subtitle">Sistema de Gestão de Prazos Acadêmicos</p>
+        </div>
+
+        <div class="login-box">
+            <div class="auth-tabs">
+                <button type="button" id="tab-login" class="btn active">Entrar</button>
+                <button type="button" id="tab-register" class="btn">Criar Conta</button>
+            </div>
+
+            <form id="auth-form">
+                <input type="email" id="auth-email" placeholder="E-mail institucional (@discente.uemg.br)" required>
+                <input type="password" id="auth-password" placeholder="Sua senha " required>
+                
+                <div id="register-fields" class="hidden">
+                    <input type="text" id="auth-name" placeholder="Seu Nome Completo">
+                    <select id="auth-periodo">
+                        <option value="">Selecione seu Período</option>
+                        <option value="1">1º Período</option>
+                        <option value="2">2º Período</option>
+                        <option value="3">3º Período</option>
+                        <option value="4">4º Período</option>
+                        <option value="5">5º Período</option>
+                        <option value="6">6º Período</option>
+                        <option value="7">7º Período</option>
+                        <option value="8">8º Período</option>
+                    </select>
+                    <input type="password" id="chave-rep" placeholder="Chave de Representante (Opcional)">
+                </div>
+
+                <button type="submit" id="btn-auth-submit" class="btn btn-primary">Entrar</button>
+            </form>
+        </div>
+    </main>
+
+
+    <main id="dashboard-screen" class="dashboard-layout hidden">
+        
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="src/img/logo-uemg-2.png" alt="Logo UEMG" class="logo-uemg-sidebar">
+                <h2>Agenda<span class="highlight"> UEMG</span></h2>
+            </div>
+            
+            <div class="user-info">
+                <div class="avatar" id="user-avatar">U</div>
+                <div class="user-details">
+                    <span id="user-role-label">Estudante</span>
+                    <strong id="user-name-label">Carregando...</strong>
+                    <span id="user-period-label">...</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul>
+                    <li class="active"><a href="#"><i class="fas fa-calendar-alt"></i> Timeline de Prazos</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn btn-danger btn-block">Sair do Sistema</button>
+            </div>
+        </aside>
+
+        <div class="content-area">
+            
+            <div class="main-column">
+                <header class="topbar">
+                    <div class="topbar-brand">
+                        <img src="src/img/logo-uemg-2.png" alt="Logo UEMG" class="logo-uemg-topbar">
+                        <h1>Prazos Acadêmicos</h1>
+                    </div>
+                    <button id="open-form-btn" class="btn btn-primary hidden">
+                        <i class="fas fa-plus"></i> Novo Prazo
+                    </button>
+                </header>
+
+                <section id="form-section" class="add-deadline-card hidden">
+                    <h2><i class="fas fa-edit"></i> Cadastrar Novo Prazo</h2>
+                    
+                    <form id="form-prazo" class="form-grid">
+                        
+                        <div class="form-group">
+                            <label for="titulo">Título da Atividade</label>
+                            <input type="text" id="titulo" required placeholder="Ex: Prova Prática">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="disciplina">Disciplina</label>
+                            <select id="disciplina" required>
+                                    <option value="">Carregando disciplinas do sistema...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="data_entrega">Data de Entrega</label>
+                            <input type="date" id="data_entrega" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tipo_evento">Tipo de Evento</label>
+                            <select id="tipo_evento" required>
+                                <option value="prova">Prova</option>
+                                <option value="trabalho">Trabalho</option>
+                                <option value="atividade">Atividade</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label>Material de Apoio</label>
+                            <label for="post-file" class="custom-file-upload">
+                                <i class="fas fa-cloud-upload-alt"></i> Anexar PDF ou Imagem
+                            </label>
+                            <input type="file" id="post-file" style="display: none;">
+                            <span id="file-name-display">Nenhum arquivo selecionado</span>
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label for="descricao">Descrição / Observações</label>
+                            <textarea id="descricao" rows="3" placeholder="Descreva os detalhes e requisitos do prazo..."></textarea>
+                        </div>
+                        
+                        <div class="form-group full-width checkbox-wrapper" id="label-public" style="display: none;">
+                            <input type="checkbox" id="post-public">
+                            <label for="post-public">Tornar este prazo PÚBLICO para toda a turma</label>
+                        </div>
+                        
+                        <div class="form-group full-width" style="display: flex; flex-direction: column; gap: 10px;">
+                            <button type="submit" id="btn-salvar" class="btn btn-primary">Gravar no Sistema</button>
+                            <button type="button" id="cancelar-form" class="btn btn-danger">Cancelar</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="deadlines-container">
+                    <div id="empty-state" class="hidden empty-state">
+                        <i class="fas fa-inbox fa-3x"></i>
+                        <p>Nenhum prazo encontrado para o seu período.</p>
+                    </div>
+                    <div id="prazos-list" class="prazos-grid">
+                        </div>
+                </section>
+            </div>
+
+            <aside class="calendar-column">
+                <div class="calendar-card">
+                    <div class="calendar-header">
+                        <button class="btn-icon" id="prev-month"><i class="fas fa-chevron-left"></i></button>
+                        <h3 id="month-year-display">Carregando...</h3>
+                        <button class="btn-icon" id="next-month"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="calendar-weekdays">
+                        <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+                    </div>
+                    <div class="calendar-days" id="calendar-days">
+                        </div>
+                </div>
+            </aside>
+
+        </div>
+    </main>
+
+    <script type="module" src="src/js/app.js"></script>
+</body>
+</html>
