@@ -19,11 +19,19 @@ export const validarDataEntrega = (dataString) => {
  * Validação de e-mail institucional da UEMG.
  */
 export const validarEmailInstitucional = (email, role) => {
+    if (!email || typeof email !== 'string') return false;
+    
     const emailLimpo = email.trim().toLowerCase();
+    
+    // Validação básica de formato de email
+    if (!emailLimpo.includes('@') || emailLimpo.startsWith('@') || emailLimpo.endsWith('@')) {
+        return false;
+    }
+    
     if (role === 'student' || role === 'representative' || role === 'aluno') {
         return emailLimpo.endsWith('@discente.uemg.br');
     } else if (role === 'professor') {
-        return emailLimpo.endsWith('@uemg.br');
+        return emailLimpo.endsWith('@uemg.br') && !emailLimpo.endsWith('@discente.uemg.br');
     }
     return false;
 };
@@ -63,7 +71,7 @@ export const criarObjetoPrazo = (titulo, descricao, data, tipo, periodo, discipl
         disciplina: disciplina.trim(),          // AQUI MUDOU: Coluna SQL exata do seu print
         description: descricao ? descricao.trim() : '', 
         event_date: data,                       
-        tipo_evento: tipo,                      
+        tipo_evento: tipo.trim(),               // AGORA FAZEMOS TRIM AQUI TAMBÉM!
         periodo: Number(periodo)                
     };
 };
