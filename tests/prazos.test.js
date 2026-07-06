@@ -1,4 +1,4 @@
-import { validarDataEntrega, criarObjetoPrazo, validarEmailInstitucional } from '../src/js/utils.js';
+import { validarDataEntrega, criarObjetoPrazo, validarEmailInstitucional, parseEnvFile, resolverDadosUsuario } from '../src/js/utils.js';
 
 // ===================================
 // MOCKS GLOBAIS
@@ -55,7 +55,41 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
     // ===================================
     // TESTES DE VALIDAÇÃO DE EMAIL
     // ===================================
-    describe('📧 Validação de Email Institucional', () => {
+    describe('⚙️ Configuração de Ambiente', () => {
+        test('Deve parsear variáveis simples do arquivo .env', () => {
+            const texto = 'SUPABASE_URL="https://exemplo.supabase.co"\nSUPABASE_ANON_KEY="token-teste"\n';
+            expect(parseEnvFile(texto)).toEqual({
+                SUPABASE_URL: 'https://exemplo.supabase.co',
+                SUPABASE_ANON_KEY: 'token-teste'
+            });
+        });
+
+        test('Deve ignorar comentários e linhas vazias no .env', () => {
+            const texto = '# comentário\nSUPABASE_URL=https://teste.supabase.co\n\nSUPABASE_ANON_KEY=abc123\n';
+            expect(parseEnvFile(texto)).toEqual({
+                SUPABASE_URL: 'https://teste.supabase.co',
+                SUPABASE_ANON_KEY: 'abc123'
+            });
+        });
+    });
+
+    describe('� Dados de Usuário', () => {
+        test('Deve priorizar o role presente nos metadados do usuário', () => {
+            const dados = resolverDadosUsuario({ role: 'representative', period: 4, name: 'Ana' });
+            expect(dados.role).toBe('representative');
+            expect(dados.period).toBe(4);
+            expect(dados.name).toBe('Ana');
+        });
+
+        test('Deve usar o perfil salvo no banco quando os metadados não trazem role', () => {
+            const dados = resolverDadosUsuario({}, { role: 'representative', period: 6, name: 'Bruno' });
+            expect(dados.role).toBe('representative');
+            expect(dados.period).toBe(6);
+            expect(dados.name).toBe('Bruno');
+        });
+    });
+
+    describe('�📧 Validação de Email Institucional', () => {
         test('Deve aceitar email de discente válido', () => {
             expect(validarEmailInstitucional('aluno@discente.uemg.br', 'student')).toBe(true);
         });
@@ -115,7 +149,7 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
                 description: 'Estudar Joins e Índices',
                 event_date: '2026-12-25',
                 tipo_evento: 'prova',
-                periodo: 3
+                is_public: false
             });
         });
 
@@ -179,16 +213,15 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
             }).toThrow('A data de entrega é obrigatória');
         });
 
-        test('Deve validar período obrigatório', () => {
+        test('Deve aceitar período ausente sem precisar do campo no objeto final', () => {
             expect(() => {
                 criarObjetoPrazo('Prova', 'Estudar', '2026-12-01', 'prova', null, 'BD');
-            }).toThrow('O prazo deve ser direcionado a um período acadêmico');
+            }).not.toThrow();
         });
 
-        test('Deve validar período obrigatório (zero é falso)', () => {
-            expect(() => {
-                criarObjetoPrazo('Prova', 'Estudar', '2026-12-01', 'prova', 0, 'BD');
-            }).toThrow('O prazo deve ser direcionado a um período acadêmico');
+        test('Deve ignorar o período no objeto final', () => {
+            const prazo = criarObjetoPrazo('Prova', 'Estudar', '2026-12-01', 'prova', 3, 'BD');
+            expect(prazo).not.toHaveProperty('periodo');
         });
 
         test('Deve validar tipo de evento obrigatório', () => {
@@ -203,14 +236,9 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
             }).toThrow('data de entrega não pode estar no passado');
         });
 
-        test('Deve converter período para número', () => {
-            const prazo1 = criarObjetoPrazo('P1', 'D', '2026-12-01', 'p', 3, 'D');
-            const prazo2 = criarObjetoPrazo('P2', 'D', '2026-12-01', 'p', '5', 'D');
-
-            expect(typeof prazo1.periodo).toBe('number');
-            expect(typeof prazo2.periodo).toBe('number');
-            expect(prazo1.periodo).toBe(3);
-            expect(prazo2.periodo).toBe(5);
+        test('Deve manter a disciplina no formato esperado pelo banco', () => {
+            const prazo = criarObjetoPrazo('P1', 'D', '2026-12-01', 'p', 3, '  Banco de Dados I  ');
+            expect(prazo.disciplina).toBe('Banco de Dados I');
         });
 
         test('Deve manter tipos de evento variados', () => {
@@ -230,7 +258,8 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
         test('Deve aceitar períodos válidos (1-8)', () => {
             for (let i = 1; i <= 8; i++) {
                 const prazo = criarObjetoPrazo('T', 'D', '2026-12-01', 'p', i, 'D');
-                expect(prazo.periodo).toBe(i);
+                expect(prazo).not.toHaveProperty('periodo');
+                expect(prazo.disciplina).toBe('D');
             }
         });
 
@@ -276,9 +305,8 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
         });
 
         test('Deve rejeitar período negativo ou inválido', () => {
-            // Período negativo ainda vai passar pela validação, mas é um número válido
             const prazo = criarObjetoPrazo('T', 'D', '2026-12-01', 'p', -1, 'D');
-            expect(prazo.periodo).toBe(-1);
+            expect(prazo).not.toHaveProperty('periodo');
         });
 
         test('Deve lidar com whitespace-only input', () => {
@@ -315,7 +343,7 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
             );
 
             expect(prazo).toBeDefined();
-            expect(prazo.periodo).toBe(3);
+            expect(prazo).not.toHaveProperty('periodo');
             expect(prazo.title).toBe('Prova de Banco de Dados');
         });
 
@@ -370,9 +398,9 @@ describe('🎓 AGENDA UEMG - Suite Completa de Testes', () => {
             expect(prazo.event_date).not.toBe('');
         });
 
-        test('Período deve ser sempre número', () => {
+        test('O objeto final não precisa de período para o banco', () => {
             const prazo = criarObjetoPrazo('T', 'D', '2026-12-01', 'p', '3', 'D');
-            expect(Number.isInteger(prazo.periodo)).toBe(true);
+            expect(prazo).not.toHaveProperty('periodo');
         });
     });
 });

@@ -139,9 +139,12 @@
                             <textarea id="descricao" rows="3" placeholder="Descreva os detalhes e requisitos do prazo..."></textarea>
                         </div>
                         
-                        <div class="form-group full-width checkbox-wrapper" id="label-public" style="display: none;">
-                            <input type="checkbox" id="post-public">
-                            <label for="post-public">Tornar este prazo PÚBLICO para toda a turma</label>
+                        <div class="form-group full-width" id="label-public" style="display: none;">
+                            <label for="post-public">Visibilidade do prazo</label>
+                            <select id="post-public">
+                                <option value="false">Privado</option>
+                                <option value="true">Público para toda a turma</option>
+                            </select>
                         </div>
                         
                         <div class="form-group full-width" style="display: flex; flex-direction: column; gap: 10px;">

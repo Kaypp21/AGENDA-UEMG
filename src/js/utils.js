@@ -2,6 +2,41 @@
  * Validação de data visando impedir prazos no passado.
  * Permite datas iguais ao dia de hoje.
  */
+export const parseEnvFile = (conteudo) => {
+    const variaveis = {};
+
+    conteudo.split(/\r?\n/).forEach(linha => {
+        const texto = linha.trim();
+        if (!texto || texto.startsWith('#')) return;
+
+        const separador = texto.indexOf('=');
+        if (separador === -1) return;
+
+        const chave = texto.slice(0, separador).trim();
+        let valor = texto.slice(separador + 1).trim();
+
+        if ((valor.startsWith('"') && valor.endsWith('"')) || (valor.startsWith("'") && valor.endsWith("'"))) {
+            valor = valor.slice(1, -1);
+        }
+
+        variaveis[chave] = valor;
+    });
+
+    return variaveis;
+};
+
+export const resolverDadosUsuario = (metadata = {}, perfil = null) => {
+    const role = metadata?.role || metadata?.role_name || perfil?.role || 'student';
+    const period = metadata?.period ?? perfil?.period ?? 1;
+    const name = metadata?.name || perfil?.name || '';
+
+    return {
+        role,
+        period: Number(period) || 1,
+        name
+    };
+};
+
 export const validarDataEntrega = (dataString) => {
     if (!dataString) return false;
     
@@ -51,27 +86,23 @@ export const criarObjetoPrazo = (titulo, descricao, data, tipo, periodo, discipl
     if (!data) {
         throw new Error("A data de entrega é obrigatória");
     }
-    if (!periodo) {
-        throw new Error("O prazo deve ser direcionado a um período acadêmico");
-    }
-    
-    // 👇 A TRAVA QUE FALTAVA ESTÁ AQUI! 👇
+
     if (!tipo || tipo.trim() === '') {
         throw new Error("O tipo de evento é obrigatório");
     }
-    
+
     // 2. Validação de Regra de Negócio (Data)
     if (!validarDataEntrega(data)) {
         throw new Error("data de entrega não pode estar no passado");
     }
 
-    // 3. Retorno mapeado para o seu Script SQL atual
+    // 3. Retorno mapeado para o schema do Supabase enviado
     return {
-        title: titulo.trim(),                   // Coluna SQL: title
-        disciplina: disciplina.trim(),          // AQUI MUDOU: Coluna SQL exata do seu print
-        description: descricao ? descricao.trim() : '', 
-        event_date: data,                       
-        tipo_evento: tipo.trim(),               // AGORA FAZEMOS TRIM AQUI TAMBÉM!
-        periodo: Number(periodo)                
+        title: titulo.trim(),
+        disciplina: disciplina.trim(),
+        description: descricao ? descricao.trim() : '',
+        event_date: data,
+        tipo_evento: tipo.trim(),
+        is_public: false
     };
 };
