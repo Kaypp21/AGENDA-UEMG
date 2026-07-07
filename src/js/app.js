@@ -1,15 +1,16 @@
 import { 
     persistirPrazo, buscarPrazos, cadastrarUsuario, logarUsuario, 
     deslogarUsuario, getSessaoAtual, excluirPrazo, atualizarPrazo,
-    uploadArquivo, buscarDisciplinasPorPeriodo // <-- NOVO IMPORT AQUI
+    uploadArquivo, buscarDisciplinasPorPeriodo, buscarPerfilUsuario // <-- NOVO IMPORT AQUI
 } from './supabase.js';
 
 // IMPORTANTE: Importando nossa fábrica de validação!
-import { criarObjetoPrazo, validarEmailInstitucional } from './utils.js';
+import { criarObjetoPrazo, validarEmailInstitucional, resolverDadosUsuario } from './utils.js';
 
 // 1. ESTADO GLOBAL
 const state = {
-    userRole: null, 
+    userRole: null,
+    userId: null,
     userPeriod: null,
     prazos: [],
     editingId: null
@@ -64,10 +65,10 @@ const initApp = () => {
     });
 
     // --- AUTO-LOGIN ---
-    getSessaoAtual().then(sessao => {
+    getSessaoAtual().then(async (sessao) => {
         if (sessao?.user) {
-            const meta = sessao.user.user_metadata;
-            entrarNoDashboard(meta.role, sessao.user.email, meta.period);
+            const perfil = await carregarDadosDoUsuario(sessao.user);
+            entrarNoDashboard(sessao.user.id, perfil.role, sessao.user.email, perfil.period, perfil.name);
         }
     });
 
@@ -83,8 +84,8 @@ const initApp = () => {
         try {
             if (modoAtual === 'login') {
                 const { user } = await logarUsuario(email, password);
-                const m = user.user_metadata;
-                entrarNoDashboard(m.role, user.email, m.period);
+                const perfil = await carregarDadosDoUsuario(user);
+                entrarNoDashboard(user.id, perfil.role, user.email, perfil.period, perfil.name);
             } else {
                 const nome = document.getElementById('auth-name').value;
                 const periodo = document.getElementById('auth-periodo').value;
@@ -102,7 +103,8 @@ const initApp = () => {
                 await cadastrarUsuario(email, password, { 
                     name: nome, 
                     period: parseInt(periodo), 
-                    secret_key: chave 
+                    secret_key: chave,
+                    role: roleFinal
                 });
 
                 Swal.fire('Sucesso!', 'Conta criada. Faça login para continuar.', 'success');
@@ -173,15 +175,15 @@ const initApp = () => {
             // 1. Validação Segura via utils.js
             const dadosValidados = criarObjetoPrazo(titulo, descricao, dataInput, tipo, periodo, disciplina);
 
-            // 2. Removemos 'periodo' pois ele não existe na tabela 'events' do seu SQL
-            delete dadosValidados.periodo;
-
-            // 3. Monta o objeto exato para o Supabase
+            // 2. Monta o objeto exato para o Supabase
+            const selectPublic = document.getElementById('post-public');
+            const isPublic = state.userRole === 'representative' && selectPublic?.value === 'true';
             const novoPrazo = {
                 ...dadosValidados,
+                period: periodo,
                 user_id: sessao.user.id,
                 file_url: fileUrl,
-                is_public: document.getElementById('post-public')?.checked || false
+                is_public: isPublic
             };
 
             if (state.editingId) {
@@ -217,9 +219,27 @@ const initApp = () => {
     });
 };
 
+const carregarDadosDoUsuario = async (usuario) => {
+    const metadata = usuario?.user_metadata || {};
+    const roleMeta = metadata.role || metadata.role_name || null;
+
+    const perfilNoBanco = await buscarPerfilUsuario(usuario?.id);
+
+    if (roleMeta || perfilNoBanco) {
+        return resolverDadosUsuario(metadata, perfilNoBanco);
+    }
+
+    return {
+        role: 'student',
+        period: 1,
+        name: metadata.name || usuario?.email?.split('@')[0] || 'Usuário'
+    };
+};
+
 // --- FUNÇÕES DE DASHBOARD E RENDERIZAÇÃO ---
 // Adicionamos 'async' aqui para poder carregar as disciplinas
-async function entrarNoDashboard(role, email, period) {
+async function entrarNoDashboard(userId, role, email, period, nomeExibicao = null) {
+    state.userId = userId;
     state.userRole = role;
     state.userPeriod = period;
     
@@ -229,21 +249,26 @@ async function entrarNoDashboard(role, email, period) {
     elements.openFormBtn.classList.remove('hidden');
     
     const labelPublic = document.getElementById('label-public');
+    const selectPublic = document.getElementById('post-public');
     if (labelPublic) {
         labelPublic.style.display = (role === 'representative') ? 'flex' : 'none';
+    }
+    if (selectPublic) {
+        selectPublic.value = 'false';
+        selectPublic.disabled = role !== 'representative';
     }
 
     const sessao = await getSessaoAtual();
     if (sessao?.user) {
         const meta = sessao.user.user_metadata || {};
-        const nomeExibicao = meta.name || email.split('@')[0];
-        const periodoExibicao = meta.period || period;
+        const nomeExibicaoFinal = nomeExibicao || meta.name || email.split('@')[0] || 'Usuário';
+        const periodoExibicao = meta.period || period || 1;
 
-        elements.userNameLabel.textContent = nomeExibicao;
+        elements.userNameLabel.textContent = nomeExibicaoFinal;
         document.getElementById('user-period-label').textContent = periodoExibicao ? `${periodoExibicao}º Período` : 'Sem período';
         
         elements.userRoleLabel.textContent = role === 'representative' ? 'Representante' : 'Estudante';
-        elements.userAvatar.textContent = nomeExibicao.charAt(0).toUpperCase();
+        elements.userAvatar.textContent = nomeExibicaoFinal.charAt(0).toUpperCase();
     }
     
     // CARREGA AS DISCIPLINAS DO BANCO
@@ -261,8 +286,11 @@ const carregarDisciplinas = async (periodo) => {
         if (!select) return;
 
         select.innerHTML = '<option value="">Selecione a disciplina...</option>';
-        disciplinas.forEach(d => {
-            select.innerHTML += `<option value="${d.name}">${d.name}</option>`;
+        (disciplinas || []).forEach(d => {
+            const nomeDisciplina = d?.name || d?.discipline_name || '';
+            if (nomeDisciplina) {
+                select.innerHTML += `<option value="${nomeDisciplina}">${nomeDisciplina}</option>`;
+            }
         });
     } catch (err) {
         console.error("Erro ao carregar disciplinas:", err);
@@ -271,7 +299,7 @@ const carregarDisciplinas = async (periodo) => {
 
 const carregarPrazos = async () => {
     try {
-        const dados = await buscarPrazos();
+        const dados = await buscarPrazos(state.userPeriod, state.userId);
         state.prazos = dados || [];
         renderizarPrazos();
     } catch (err) {
@@ -294,8 +322,11 @@ const renderizarPrazos = () => {
         const tipo = prazo.tipo_evento?.toLowerCase() || 'atividade';
         card.className = `prazo-card glass-panel tipo-${tipo} ${prazo.is_public ? 'oficial' : ''}`;
         
-        const [ano, mes, dia] = prazo.event_date.split('-');
+        const [ano, mes, dia] = (prazo.event_date || '').split('-');
+        const dataFormatada = dia ? `${dia}/${mes}/${ano}` : 'Data inválida';
+        const isPublic = prazo.is_public === true || prazo.is_public === 'true' || prazo.is_public === 1 || prazo.is_public === 'TRUE';
         
+        card.className = `prazo-card glass-panel tipo-${tipo} ${isPublic ? 'oficial' : ''}`;
         card.innerHTML = `
             <div class="prazo-header">
                 <span class="prazo-badge ${tipo}">${tipo.toUpperCase()}</span>
@@ -308,7 +339,7 @@ const renderizarPrazos = () => {
             
             <h3 class="prazo-title">${prazo.title}</h3>
             
-            ${prazo.disciplina ? `<span style="font-size: 0.8rem; color: var(--primary); font-weight: 700; display: block; margin-bottom: 10px;"><i class="fas fa-book"></i> ${prazo.discipline_name}</span>` : ''}
+            ${prazo.disciplina || prazo.disciplins || prazo.discipline_name || prazo.discipline || prazo.disciplineName ? `<span style="font-size: 0.8rem; color: var(--primary); font-weight: 700; display: block; margin-bottom: 10px;"><i class="fas fa-book"></i> ${prazo.disciplina || prazo.disciplins || prazo.discipline_name || prazo.discipline || prazo.disciplineName}</span>` : ''}
             
             <p class="prazo-body">${prazo.description || ''}</p>
             
@@ -320,7 +351,7 @@ const renderizarPrazos = () => {
                 ` : ''}
             </div>
             <div class="prazo-footer">
-                <i class="far fa-calendar-alt"></i> Entrega: <strong>${dia}/${mes}/${ano}</strong>
+                <i class="far fa-calendar-alt"></i> Entrega: <strong>${dataFormatada}</strong>
             </div>
         `;
         elements.prazosList.appendChild(card);
